@@ -145,7 +145,7 @@ static int jp_putc(int c, janpatch_ctx* ctx, janpatch_buffer* buffer) {
         // flush the page buffer...
         if (buffer->current_page != 0xFFFFFFFF) {
             jp_fseek(buffer, buffer->current_page * buffer->size, SEEK_SET);
-            jp_fwrite(ctx, buffer->buffer, 1, buffer->current_page_size, buffer);
+            fwrite(buffer->buffer, 1, buffer->current_page_size, buffer->stream);
 
             if (ctx->progress) {
                 ctx->progress(position * 100 / ctx->max_file_size);
@@ -179,13 +179,13 @@ static void jp_final_flush(janpatch_ctx* ctx, janpatch_buffer* buffer) {
         // flush the page buffer...
         if (buffer->current_page != 0xFFFFFFFF) {
             jp_fseek(buffer, buffer->current_page * buffer->size, SEEK_SET);
-            jp_fwrite(ctx, buffer->buffer, 1, buffer->current_page_size, buffer);
+            fwrite(buffer->buffer, 1, buffer->current_page_size, buffer->stream);
         }
     }
 
     // flush the new page buffer
     jp_fseek(buffer, page * buffer->size, SEEK_SET);
-    jp_fwrite(ctx, buffer->buffer, 1, position_in_page, buffer);
+    fwrite(buffer->buffer, 1, position_in_page, buffer->stream);
 
     if (ctx->progress) {
         ctx->progress(100);
