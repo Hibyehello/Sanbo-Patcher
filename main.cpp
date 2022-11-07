@@ -26,8 +26,8 @@ int main()
 
   // fclose(buffer.bin);
   // Open streams
-  FILE *sanbo_bin = fopen("file.txt", "rb+");
-  FILE *patch = fopen("patchtxt.diff", "rb");
+  FILE *sanbo_bin = fopen("main1", "rb+");
+  FILE *patch = fopen("patch.diff", "rb");
   //FILE *temp = fopen("patched.txt", "wb");
 
   // janpatch_ctx contains buffers, and references to the file system functions
@@ -41,7 +41,7 @@ int main()
                       &ftell};
 
   int ret = janpatch(ctx, sanbo_bin, patch, sanbo_bin);
-  //buffer.flush(temp);
+  buffer.flush(sanbo_bin);
 
   return ret;
 }

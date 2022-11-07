@@ -37,20 +37,11 @@ size_t FIFO::write(const void *ptr, size_t size_dummy, size_t count,
   u8* buf = (u8*)ptr;
 
   f_ReadPos = ftell(file);
-  fseek(file, f_WritePos, SEEK_SET);
+  fseek(file, 0, SEEK_SET);
 
   for (int i = 0; i < count; i++) {
     if (bufferFull) 
       fwrite((void *)&buffer[writeIdx], sizeof(u8), 1, file);
-    //{
-    //   m_buffer[m_loc++] = buffer[writeIdx];
-    //   if(m_loc >= 1000) {
-    //     m_loc = 0;
-    //     writeAllFile(file, &f_WritePos);
-    //     f_WritePos = ftell(file);
-    //   }
-    // }
-
 
     buffer[writeIdx] = buf[i];
 
@@ -60,10 +51,10 @@ size_t FIFO::write(const void *ptr, size_t size_dummy, size_t count,
       bufferFull = true;
   }
 
-  printf("Write: %d, Read: %d\n", f_WritePos, f_ReadPos);
+  fprintf(stderr, "Write: %d, Read: %d\n", f_WritePos, f_ReadPos);
 
   f_WritePos = ftell(file);
-  fseek(file, f_ReadPos, SEEK_SET);
+  //fseek(file, f_ReadPos, 0);
 
   return size_dummy;
 }
