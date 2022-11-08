@@ -37,7 +37,7 @@ size_t FIFO::write(const void *ptr, size_t size_dummy, size_t count,
   u8* buf = (u8*)ptr;
 
   f_ReadPos = ftell(file);
-  fseek(file, 0, SEEK_SET);
+  //fseek(file, 0, SEEK_SET);
 
   for (int i = 0; i < count; i++) {
     if (bufferFull) 

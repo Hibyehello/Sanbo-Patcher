@@ -26,8 +26,8 @@ int main()
 
   // fclose(buffer.bin);
   // Open streams
-  FILE *sanbo_bin = fopen("main1", "rb+");
-  FILE *patch = fopen("patch.diff", "rb");
+  FILE *sanbo_bin = fopen("lipsum1.txt", "rb+");
+  FILE *patch = fopen("patchlipsum.diff", "rb");
   //FILE *temp = fopen("patched.txt", "wb");
 
   // janpatch_ctx contains buffers, and references to the file system functions
