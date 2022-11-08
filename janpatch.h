@@ -208,7 +208,7 @@ static void process_mod(janpatch_ctx *ctx, janpatch_buffer *source, janpatch_buf
         // so... if it's *NOT* an ESC character, just write it to the target stream
         if (m != JANPATCH_OPERATION_ESC) {
             // JANPATCH_DEBUG("NOT ESC\n");
-            jp_putc(m, ctx, target);
+            ctx->fwrite(&m, 1, 1, target->stream);
             if (up_source_stream) {
                 jp_fseek(source, 1, SEEK_CUR); // and up source
             }
@@ -228,7 +228,7 @@ static void process_mod(janpatch_ctx *ctx, janpatch_buffer *source, janpatch_buf
         // if the character after this is *not* an operator (except ESC)
         if (m == JANPATCH_OPERATION_ESC) {
             // JANPATCH_DEBUG("ESC, NEXT CHAR ALSO ESC\n");
-            jp_putc(m, ctx, target);
+            ctx->fwrite(&m, 1, 1, target->stream);
             if (up_source_stream) {
                 jp_fseek(source, 1, SEEK_CUR);
             }
@@ -241,8 +241,9 @@ static void process_mod(janpatch_ctx *ctx, janpatch_buffer *source, janpatch_buf
         }
         else { // else... write both the ESC and m
             // JANPATCH_DEBUG("ESC, BUT NO OPERATOR\n");
-            jp_putc(JANPATCH_OPERATION_ESC, ctx, target);
-            jp_putc(m, ctx, target);
+            int val = JANPATCH_OPERATION_ESC;
+            ctx->fwrite(&val, 1, 1, target->stream);
+            ctx->fwrite(&m, 1, 1, target->stream);
             if (up_source_stream) {
                 jp_fseek(source, 2, SEEK_CUR); // up source by 2
             }
@@ -313,93 +314,93 @@ int janpatch(janpatch_ctx ctx, JANPATCH_STREAM *source, JANPATCH_STREAM *patch, 
     int c;
     while ((c = jp_getc(&ctx, &ctx.patch_buffer)) != EOF) {
         if (c == JANPATCH_OPERATION_ESC) {
-            c = jp_getc(&ctx, &ctx.patch_buffer);
-        }
-        else if (c != -1) {
-            // Rewind 1 character, for the one we just consummed, and set a default operation of MOD
-            jp_fseek(&ctx.patch_buffer, -1, SEEK_CUR);
-            c = JANPATCH_OPERATION_MOD;
-        }
-        switch (c) {
-            case JANPATCH_OPERATION_EQL: {
-                int length = find_length(&ctx, &ctx.patch_buffer);
-                if (length == -1) {
-                    JANPATCH_ERROR("EQL length invalid\n");
-                    JANPATCH_ERROR("Positions are, source=%ld patch=%ld new=%ld\n", ctx.source_buffer.position, ctx.patch_buffer.position, ctx.target_buffer.position);
-                    return 1;
-                }
-
-                JANPATCH_DEBUG("EQL: %d bytes\n", length);
-
-                for (int ix = 0; ix < length; ix++) {
-                    int r = jp_getc(&ctx, &ctx.source_buffer);
-                    if (r < -1) {
-                        JANPATCH_ERROR("fread returned %d, but expected character\n", r);
+            switch ((c = jp_getc(&ctx, &ctx.patch_buffer))) {
+                case JANPATCH_OPERATION_EQL: {
+                    int length = find_length(&ctx, &ctx.patch_buffer);
+                    if (length == -1) {
+                        JANPATCH_ERROR("EQL length invalid\n");
                         JANPATCH_ERROR("Positions are, source=%ld patch=%ld new=%ld\n", ctx.source_buffer.position, ctx.patch_buffer.position, ctx.target_buffer.position);
                         return 1;
                     }
 
-                    jp_putc(r, &ctx, &ctx.target_buffer);
+                    JANPATCH_DEBUG("EQL: %d bytes\n", length);
+
+                    for (int ix = 0; ix < length; ix++) {
+                        int r = jp_getc(&ctx, &ctx.source_buffer);
+                        if (r < -1) {
+                            JANPATCH_ERROR("fread returned %d, but expected character\n", r);
+                            JANPATCH_ERROR("Positions are, source=%ld patch=%ld new=%ld\n", ctx.source_buffer.position, ctx.patch_buffer.position, ctx.target_buffer.position);
+                            return 1;
+                        }
+
+                        jp_putc(r, &ctx, &ctx.target_buffer);
+                    }
+
+                    break;
                 }
+                case JANPATCH_OPERATION_MOD: {
+                    JANPATCH_DEBUG("MOD: ");
 
-                break;
-            }
-            case JANPATCH_OPERATION_MOD: {
-                JANPATCH_DEBUG("MOD: ");
+                    // MOD means to modify the next series of bytes
+                    // so just write everything (until the next ESC sequence) to the target JANPATCH_STREAM
+                    // but also up the position in the source JANPATCH_STREAM every time
+                    process_mod(&ctx, &ctx.source_buffer, &ctx.patch_buffer, &ctx.target_buffer, true);
+                    break;
+                }
+                case JANPATCH_OPERATION_INS: {
+                    JANPATCH_DEBUG("INS: ");
+                    // INS inserts the sequence in the new JANPATCH_STREAM, but does not up the position of the source JANPATCH_STREAM
+                    // so just write everything (until the next ESC sequence) to the target JANPATCH_STREAM
 
-                // MOD means to modify the next series of bytes
-                // so just write everything (until the next ESC sequence) to the target JANPATCH_STREAM
-                // but also up the position in the source JANPATCH_STREAM every time
-                process_mod(&ctx, &ctx.source_buffer, &ctx.patch_buffer, &ctx.target_buffer, true);
-                break;
-            }
-            case JANPATCH_OPERATION_INS: {
-                JANPATCH_DEBUG("INS: ");
-                // INS inserts the sequence in the new JANPATCH_STREAM, but does not up the position of the source JANPATCH_STREAM
-                // so just write everything (until the next ESC sequence) to the target JANPATCH_STREAM
+                    process_mod(&ctx, &ctx.source_buffer, &ctx.patch_buffer, &ctx.target_buffer, false);
+                    break;
+                }
+                case JANPATCH_OPERATION_BKT: {
+                    // BKT = backtrace, seek back in source JANPATCH_STREAM with X bytes...
+                    int length = find_length(&ctx, &ctx.patch_buffer);
+                    if (length == -1) {
+                        JANPATCH_ERROR("BKT length invalid\n");
+                        JANPATCH_ERROR("Positions are, source=%ld patch=%ld new=%ld\n", ctx.source_buffer.position, ctx.patch_buffer.position, ctx.target_buffer.position);
+                        return 1;
+                    }
 
-                process_mod(&ctx, &ctx.source_buffer, &ctx.patch_buffer, &ctx.target_buffer, false);
-                break;
-            }
-            case JANPATCH_OPERATION_BKT: {
-                // BKT = backtrace, seek back in source JANPATCH_STREAM with X bytes...
-                int length = find_length(&ctx, &ctx.patch_buffer);
-                if (length == -1) {
-                    JANPATCH_ERROR("BKT length invalid\n");
+                    JANPATCH_DEBUG("BKT: %d bytes\n", -length);
+
+                    jp_fseek(&ctx.source_buffer, -length, SEEK_CUR);
+
+                    break;
+                }
+                case JANPATCH_OPERATION_DEL: {
+                    // DEL deletes bytes, so up the source stream with X bytes
+                    int length = find_length(&ctx, &ctx.patch_buffer);
+                    if (length == -1) {
+                        JANPATCH_ERROR("DEL length invalid\n");
+                        JANPATCH_ERROR("Positions are, source=%ld patch=%ld new=%ld\n", ctx.source_buffer.position, ctx.patch_buffer.position, ctx.target_buffer.position);
+                        return 1;
+                    }
+
+                    JANPATCH_DEBUG("DEL: %d bytes\n", length);
+
+                    jp_fseek(&ctx.source_buffer, length, SEEK_CUR);
+                    break;
+                }
+                case -1: {
+                    // End of file stream... rewind 1 character and break, this will yield back to main loop
+                    jp_fseek(&ctx.source_buffer, -1, SEEK_CUR);
+                    break;
+                }
+                default: {
+                    JANPATCH_ERROR("Unsupported operator %02x\n", c);
                     JANPATCH_ERROR("Positions are, source=%ld patch=%ld new=%ld\n", ctx.source_buffer.position, ctx.patch_buffer.position, ctx.target_buffer.position);
                     return 1;
                 }
-
-                JANPATCH_DEBUG("BKT: %d bytes\n", -length);
-
-                jp_fseek(&ctx.source_buffer, -length, SEEK_CUR);
-
-                break;
             }
-            case JANPATCH_OPERATION_DEL: {
-                // DEL deletes bytes, so up the source stream with X bytes
-                int length = find_length(&ctx, &ctx.patch_buffer);
-                if (length == -1) {
-                    JANPATCH_ERROR("DEL length invalid\n");
-                    JANPATCH_ERROR("Positions are, source=%ld patch=%ld new=%ld\n", ctx.source_buffer.position, ctx.patch_buffer.position, ctx.target_buffer.position);
-                    return 1;
-                }
+        }
+        else {
+            JANPATCH_ERROR("Expected ESC but got %02x\n", c);
+            JANPATCH_ERROR("Positions are, source=%ld patch=%ld new=%ld\n", ctx.source_buffer.position, ctx.patch_buffer.position, ctx.target_buffer.position);
 
-                JANPATCH_DEBUG("DEL: %d bytes\n", length);
-
-                jp_fseek(&ctx.source_buffer, length, SEEK_CUR);
-                break;
-            }
-            case -1: {
-                // End of file stream... rewind 1 character and break, this will yield back to main loop
-                jp_fseek(&ctx.source_buffer, -1, SEEK_CUR);
-                break;
-            }
-            default: {
-                JANPATCH_ERROR("Unsupported operator %02x\n", c);
-                JANPATCH_ERROR("Positions are, source=%ld patch=%ld new=%ld\n", ctx.source_buffer.position, ctx.patch_buffer.position, ctx.target_buffer.position);
-                return 1;
-            }
+            return 1;
         }
     }
 
