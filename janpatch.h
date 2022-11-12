@@ -333,7 +333,8 @@ int janpatch(janpatch_ctx ctx, JANPATCH_STREAM *source, JANPATCH_STREAM *patch, 
                             return 1;
                         }
 
-                        jp_putc(r, &ctx, &ctx.target_buffer);
+                        ctx.fwrite(&r, 1, 1,ctx.target_buffer.stream);
+                        
                     }
 
                     break;

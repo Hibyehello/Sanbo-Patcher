@@ -28,7 +28,7 @@ int main()
   // Open streams
   FILE *sanbo_bin = fopen("lipsum1.txt", "rb+");
   FILE *patch = fopen("patchlipsum.diff", "rb");
-  FILE *temp = fopen("patchedlipsum.txt", "wb");
+  //FILE *temp = fopen("patchedlipsum.txt", "wb");
 
   // janpatch_ctx contains buffers, and references to the file system functions
   janpatch_ctx ctx = {{(unsigned char *)malloc(1024), 1024}, // source buffer
@@ -40,8 +40,8 @@ int main()
                       &fseek,
                       &ftell};
 
-  int ret = janpatch(ctx, sanbo_bin, patch, temp);
-  buffer.flush(temp);
+  int ret = janpatch(ctx, sanbo_bin, patch, sanbo_bin);
+  buffer.flush(sanbo_bin);
 
   return ret;
 }

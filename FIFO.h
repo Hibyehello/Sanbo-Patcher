@@ -24,24 +24,32 @@ struct FIFO {
 int m_buffer[1024];
 int m_loc = 0;
 
-void writeAllFile(FILE* file, u32* writePos)
-{
-  fprintf(stderr, "%d\n", *writePos);
-  fseek(file, *writePos, SEEK_SET);
-  for(int i = 0; i < sizeof(m_buffer); i++)
-    fwrite((void*)&m_buffer[i], 1, 1, file);
-}
+// void writeAllFile(FILE* file, u32* writePos)
+// {
+//   fprintf(stderr, "%d\n", *writePos);
+//   fseek(file, *writePos, SEEK_SET);
+//   for(int i = 0; i < sizeof(m_buffer); i++)
+//     fwrite((void*)&m_buffer[i], 1, 1, file);
+// }
 
 size_t FIFO::write(const void *ptr, size_t size_dummy, size_t count,
                    FILE *file) {
   u8* buf = (u8*)ptr;
+  //printf("%c\n", *(char*)ptr);
 
   f_ReadPos = ftell(file);
-  //fseek(file, 0, SEEK_SET);
+  if (ftell(file) != f_WritePos) {
+    fseek(file, f_WritePos, SEEK_SET);
+  }
 
   for (int i = 0; i < count; i++) {
-    if (bufferFull) 
+    if (bufferFull) {
       fwrite((void *)&buffer[writeIdx], sizeof(u8), 1, file);
+      printf("Writing %c at %d\n", buffer[writeIdx], f_WritePos);
+      f_WritePos++; //Let's do it this way
+    }
+
+    //printf("%s", (char*)&buf[i]);
 
     buffer[writeIdx] = buf[i];
 
@@ -51,9 +59,11 @@ size_t FIFO::write(const void *ptr, size_t size_dummy, size_t count,
       bufferFull = true;
   }
 
-  fprintf(stderr, "Write: %d, Read: %d\n", f_WritePos, f_ReadPos);
+  //fprintf(stderr, "Write: %d, Read: %d\n", f_WritePos, f_ReadPos);
 
-  f_WritePos = ftell(file);
+  //TODO: Kevin has commented this out, uncomment if things are broken now, also see line 47
+  //TODO: OK - Hib
+  //f_WritePos = ftell(file);
   //fseek(file, f_ReadPos, 0);
 
   return size_dummy;
@@ -66,10 +76,14 @@ void FIFO::flush(FILE* file)
     for (int i = 0; i < size; i++) {
       fwrite((void*)&buffer[writeIdx], sizeof(u8), 1, file);
       writeIdx = (writeIdx + 1) % size;
+      printf("Writing %c at %d\n", buffer[writeIdx], f_WritePos);
+      f_WritePos++;
     }
 } else {
     for (int i = 0; i < writeIdx; i++) {
       fwrite((void*)&buffer[i], sizeof(u8), 1, file);
+      printf("Writing %c at %d\n", buffer[i], f_WritePos);
+      f_WritePos++;
     }
 }
 }
