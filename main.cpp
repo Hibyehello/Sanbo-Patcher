@@ -1,6 +1,7 @@
 #include "FIFO.h"
 #include "janpatch.h"
 #include <stdio.h>
+#include <unistd.h>
 #include <stdlib.h>
 
 size_t write(const void *ptr, size_t size_dummy, size_t count, FILE *file);
@@ -26,8 +27,9 @@ int main()
 
   // fclose(buffer.bin);
   // Open streams
-  FILE *sanbo_bin = fopen("lipsum1.txt", "rb+");
-  FILE *patch = fopen("patchlipsum.diff", "rb");
+  const char* sanbo_bin_path = "main1";
+  FILE *sanbo_bin = fopen(sanbo_bin_path, "rb+");
+  FILE *patch = fopen("patch.diff", "rb");
   //FILE *temp = fopen("patchedlipsum.txt", "wb");
 
   // janpatch_ctx contains buffers, and references to the file system functions
@@ -42,6 +44,8 @@ int main()
 
   int ret = janpatch(ctx, sanbo_bin, patch, sanbo_bin);
   buffer.flush(sanbo_bin);
+
+  truncate(sanbo_bin_path, buffer.f_WritePos);
 
   return ret;
 }

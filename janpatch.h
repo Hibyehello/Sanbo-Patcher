@@ -405,7 +405,7 @@ int janpatch(janpatch_ctx ctx, JANPATCH_STREAM *source, JANPATCH_STREAM *patch, 
         }
     }
 
-    jp_final_flush(&ctx, &ctx.target_buffer);
+    //jp_final_flush(&ctx, &ctx.target_buffer);
 
     return 0;
 }
