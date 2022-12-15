@@ -398,10 +398,7 @@ int janpatch(janpatch_ctx ctx, JANPATCH_STREAM *source, JANPATCH_STREAM *patch, 
             }
         }
         else {
-            JANPATCH_ERROR("Expected ESC but got %02x\n", c);
-            JANPATCH_ERROR("Positions are, source=%ld patch=%ld new=%ld\n", ctx.source_buffer.position, ctx.patch_buffer.position, ctx.target_buffer.position);
-
-            return 1;
+            process_mod(&ctx, &ctx.source_buffer, &ctx.patch_buffer, &ctx.target_buffer, true);
         }
     }
 
