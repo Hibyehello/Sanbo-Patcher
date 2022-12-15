@@ -345,7 +345,7 @@ int janpatch(janpatch_ctx ctx, JANPATCH_STREAM *source, JANPATCH_STREAM *patch, 
                     // MOD means to modify the next series of bytes
                     // so just write everything (until the next ESC sequence) to the target JANPATCH_STREAM
                     // but also up the position in the source JANPATCH_STREAM every time
-                    process_mod(&ctx, &ctx.source_buffer, &ctx.patch_buffer, &ctx.target_buffer, true);
+                    process_mod(&ctx, &ctx.source_buffer, &ctx.patch_buffer, &ctx.target_buffer, true); 
                     break;
                 }
                 case JANPATCH_OPERATION_INS: {
@@ -398,10 +398,7 @@ int janpatch(janpatch_ctx ctx, JANPATCH_STREAM *source, JANPATCH_STREAM *patch, 
             }
         }
         else {
-            JANPATCH_ERROR("Expected ESC but got %02x\n", c);
-            JANPATCH_ERROR("Positions are, source=%ld patch=%ld new=%ld\n", ctx.source_buffer.position, ctx.patch_buffer.position, ctx.target_buffer.position);
-
-            return 1;
+			process_mod(&ctx, &ctx.source_buffer, &ctx.patch_buffer, &ctx.target_buffer, true);
         }
     }
 
