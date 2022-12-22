@@ -16,9 +16,15 @@ struct FIFO {
   u32 size;
   u8 *buffer;
   bool bufferFull = false;
+  
+  u32 size2;
+  u8 *buffer2;
+  size_t buffer2pos = 0;
 
+  size_t write2(const void *ptr, size_t size, size_t count, FILE *file);
   size_t write(const void *ptr, size_t size, size_t count, FILE *file);
   void flush(FILE* file);
+  void flush2(FILE* file);
 };
 
 int m_buffer[1024];
@@ -32,21 +38,47 @@ int m_loc = 0;
 //     fwrite((void*)&m_buffer[i], 1, 1, file);
 // }
 
+size_t FIFO::write2(const void *ptr, size_t size_dummy, size_t count,
+                   FILE *file) {
+    if (size_dummy * count > size2 - buffer2pos) {
+        //Seek to the correct location
+        f_ReadPos = ftell(file);
+        if (f_ReadPos != f_WritePos) {
+            fseek(file, f_WritePos, SEEK_SET);
+        }
+        
+        //Write buffer and reset values
+        fwrite((void*)buffer2, sizeof(u8), buffer2pos, file);
+        f_WritePos += buffer2pos;
+        buffer2pos = 0;
+    }
+    
+    if (size_dummy * count > size2) {
+        //Doesn't fit buffer, just write it to the file
+        f_ReadPos = ftell(file);
+        if (f_ReadPos != f_WritePos) {
+            fseek(file, f_WritePos, SEEK_SET);
+        }
+        fwrite(ptr, size_dummy, count, file);
+        f_WritePos += size_dummy * count;
+    } else {
+        memcpy(&buffer2[buffer2pos], ptr, size_dummy * count);
+        buffer2pos += size_dummy * count;
+    }
+    
+    
+    return size_dummy * count;
+}
+
 size_t FIFO::write(const void *ptr, size_t size_dummy, size_t count,
                    FILE *file) {
   u8* buf = (u8*)ptr;
   //printf("%c\n", *(char*)ptr);
 
-  f_ReadPos = ftell(file);
-  if (ftell(file) != f_WritePos) {
-    fseek(file, f_WritePos, SEEK_SET);
-  }
-
   for (int i = 0; i < count; i++) {
     if (bufferFull) {
-      fwrite((void *)&buffer[writeIdx], sizeof(u8), 1, file);
-      printf("Writing %c at %d\n", buffer[writeIdx], f_WritePos);
-      f_WritePos++; //Let's do it this way
+      write2((void *)&buffer[writeIdx], sizeof(u8), 1, file);
+      //printf("Writing %c at %d\n", buffer[writeIdx], f_WritePos);
     }
 
     //printf("%s", (char*)&buf[i]);
@@ -71,19 +103,33 @@ size_t FIFO::write(const void *ptr, size_t size_dummy, size_t count,
 
 void FIFO::flush(FILE* file)
 {
-  fseek(file, f_WritePos, SEEK_SET);
-  if (bufferFull) {
-    for (int i = 0; i < size; i++) {
-      fwrite((void*)&buffer[writeIdx], sizeof(u8), 1, file);
-      writeIdx = (writeIdx + 1) % size;
-      printf("Writing %c at %d\n", buffer[writeIdx], f_WritePos);
-      f_WritePos++;
+    fseek(file, f_WritePos, SEEK_SET);
+    if (bufferFull) {
+        for (int i = 0; i < size; i++) {
+          write2((void*)&buffer[writeIdx], sizeof(u8), 1, file);
+          writeIdx = (writeIdx + 1) % size;
+        }
+    } else {
+        for (int i = 0; i < writeIdx; i++) {
+          write2((void*)&buffer[i], sizeof(u8), 1, file);
+        }
     }
-} else {
-    for (int i = 0; i < writeIdx; i++) {
-      fwrite((void*)&buffer[i], sizeof(u8), 1, file);
-      printf("Writing %c at %d\n", buffer[i], f_WritePos);
-      f_WritePos++;
-    }
+    flush2(file);
 }
+
+void FIFO::flush2(FILE* file)
+{
+    //Seek to the correct location
+    f_ReadPos = ftell(file);
+    if (f_ReadPos != f_WritePos) {
+        fseek(file, f_WritePos, SEEK_SET);
+    }
+    
+    //Write buffer and reset values
+    fwrite((void*)buffer2, sizeof(u8), buffer2pos, file);
+    f_WritePos += buffer2pos;
+    buffer2pos = 0;
+    if (f_ReadPos != f_WritePos) {
+        fseek(file, f_ReadPos, SEEK_SET);
+    }
 }

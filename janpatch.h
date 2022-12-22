@@ -392,9 +392,12 @@ int janpatch(janpatch_ctx ctx, JANPATCH_STREAM *source, JANPATCH_STREAM *patch, 
                     break;
                 }
                 default: {
-                    JANPATCH_ERROR("Unsupported operator %02x\n", c);
-                    JANPATCH_ERROR("Positions are, source=%ld patch=%ld new=%ld\n", ctx.source_buffer.position, ctx.patch_buffer.position, ctx.target_buffer.position);
-                    return 1;
+                    //VERY VERY VERY UNTESTED
+                    jp_fseek(&ctx.patch_buffer, -2, SEEK_CUR);
+                    process_mod(&ctx, &ctx.source_buffer, &ctx.patch_buffer, &ctx.target_buffer, true);
+                    
+                    //For some reason we need to do this
+                    jp_fseek(&ctx.target_buffer, 2, SEEK_CUR);
                 }
             }
         }

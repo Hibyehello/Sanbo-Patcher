@@ -10,9 +10,11 @@ FIFO buffer;
 
 int main()
 {
-  buffer.size = 0xf;
-
+  buffer.size = 0x10000;
   buffer.buffer = (u8 *)malloc(sizeof(u8) * buffer.size);
+  
+  buffer.size2 = 0x10000;
+  buffer.buffer2 = (u8 *)malloc(sizeof(u8) * buffer.size2);
   
 
   // printf("%d\n", buffer.size);
@@ -33,9 +35,9 @@ int main()
   //FILE *temp = fopen("patchedlipsum.txt", "wb");
 
   // janpatch_ctx contains buffers, and references to the file system functions
-  janpatch_ctx ctx = {{(unsigned char *)malloc(1024), 1024}, // source buffer
-                      {(unsigned char *)malloc(1024), 1024}, // patch buffer
-                      {(unsigned char *)malloc(1024), 1024}, // target buffer
+  janpatch_ctx ctx = {{(unsigned char *)malloc(0x10000), 0x10000}, // source buffer
+                      {(unsigned char *)malloc(0x10000), 0x10000}, // patch buffer
+                      {(unsigned char *)malloc(0x10000), 0x10000}, // target buffer
 
                       &fread,
                       &write,
