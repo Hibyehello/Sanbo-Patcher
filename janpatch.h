@@ -18,7 +18,8 @@
 #include <stdio.h>
 #define JANPATCH_STREAM     FILE
 #elif !defined(JANPATCH_STREAM)
-#error "JANPATCH_STREAM not defined, and not on POSIX system. Please specify the JANPATCH_STREAM macro"
+#define JANPATCH_STREAM     FILE
+//#error "JANPATCH_STREAM not defined, and not on POSIX system. Please specify the JANPATCH_STREAM macro"
 #endif
 
 typedef struct {
@@ -398,7 +399,11 @@ int janpatch(janpatch_ctx ctx, JANPATCH_STREAM *source, JANPATCH_STREAM *patch, 
             }
         }
         else {
+			jp_fseek(&ctx.patch_buffer, -1, SEEK_CUR);
             process_mod(&ctx, &ctx.source_buffer, &ctx.patch_buffer, &ctx.target_buffer, true);
+			
+			//For some reason we need to do this
+			jp_fseek(&ctx.target_buffer, 1, SEEK_CUR);
         }
     }
 
