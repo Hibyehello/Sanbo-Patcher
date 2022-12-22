@@ -399,11 +399,11 @@ int janpatch(janpatch_ctx ctx, JANPATCH_STREAM *source, JANPATCH_STREAM *patch, 
             }
         }
         else {
-			jp_fseek(&ctx.patch_buffer, -1, SEEK_CUR);
+            jp_fseek(&ctx.patch_buffer, -1, SEEK_CUR);
             process_mod(&ctx, &ctx.source_buffer, &ctx.patch_buffer, &ctx.target_buffer, true);
-			
-			//For some reason we need to do this
-			jp_fseek(&ctx.target_buffer, 1, SEEK_CUR);
+            
+            //For some reason we need to do this
+            jp_fseek(&ctx.target_buffer, 1, SEEK_CUR);
         }
     }
 
