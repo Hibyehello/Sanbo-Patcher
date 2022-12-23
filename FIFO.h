@@ -57,7 +57,6 @@ size_t FIFO::write2(const void *ptr, size_t size_dummy, size_t count,
         //Doesn't fit buffer, just write it to the file
         f_ReadPos = ftell(file);
         if (f_ReadPos != f_WritePos) {
-            printf("fseek\n");
             fseek(file, f_WritePos, SEEK_SET);
         }
         fwrite(ptr, size_dummy, count, file);
