@@ -108,7 +108,7 @@ static int jp_fseek(janpatch_buffer *buffer, long int offset, int origin) {
  */
 static int jp_getc(janpatch_ctx* ctx, janpatch_buffer* buffer) {
     long position = buffer->position;
-    if (position < 0) return -1;
+    if (position < 0) return -2;
 
     // calculate the current page...
     uint32_t page = ((unsigned long)position) / buffer->size;
@@ -197,19 +197,27 @@ static void process_mod(janpatch_ctx *ctx, janpatch_buffer *source, janpatch_buf
     // it can be that ESC character is actually in the data, but then it's prefixed with another ESC
     // so... we're looking for a lone ESC character
     size_t cnt = 0;
+    u8 buffer[0x10000];;
+    u32 bufferLen = 0;
+    u32 bufferMaxLen = 0x10000;
     while (1) {
+        if (bufferLen == bufferMaxLen) {
+            ctx->fwrite(buffer, 1, bufferMaxLen, target->stream);
+            bufferLen = 0;
+        }
         cnt++;
         int m = jp_getc(ctx, patch);
         if (m == -1) {
             // End of file stream... rewind 1 character and return, this will yield back to janpatch main function, which will exit
             jp_fseek(source, -1, SEEK_CUR);
-            return;
+            break;
         }
         // JANPATCH_DEBUG("%02x ", m);
         // so... if it's *NOT* an ESC character, just write it to the target stream
         if (m != JANPATCH_OPERATION_ESC) {
             // JANPATCH_DEBUG("NOT ESC\n");
-            ctx->fwrite(&m, 1, 1, target->stream);
+            buffer[bufferLen] = m;
+            bufferLen++;
             if (up_source_stream) {
                 jp_fseek(source, 1, SEEK_CUR); // and up source
             }
@@ -223,13 +231,14 @@ static void process_mod(janpatch_ctx *ctx, janpatch_buffer *source, janpatch_buf
         if (m == -1) {
             // End of file stream... rewind 1 character and return, this will yield back to janpatch main function, which will exit
             jp_fseek(source, -1, SEEK_CUR);
-            return;
+            break;
         }
 
         // if the character after this is *not* an operator (except ESC)
         if (m == JANPATCH_OPERATION_ESC) {
             // JANPATCH_DEBUG("ESC, NEXT CHAR ALSO ESC\n");
-            ctx->fwrite(&m, 1, 1, target->stream);
+            buffer[bufferLen] = m;
+            bufferLen++;
             if (up_source_stream) {
                 jp_fseek(source, 1, SEEK_CUR);
             }
@@ -243,13 +252,23 @@ static void process_mod(janpatch_ctx *ctx, janpatch_buffer *source, janpatch_buf
         else { // else... write both the ESC and m
             // JANPATCH_DEBUG("ESC, BUT NO OPERATOR\n");
             int val = JANPATCH_OPERATION_ESC;
-            ctx->fwrite(&val, 1, 1, target->stream);
-            ctx->fwrite(&m, 1, 1, target->stream);
+            buffer[bufferLen] = val;
+            bufferLen++;
+            
+            //It can happen that we write the final byte inbetween
+            if (bufferLen == bufferMaxLen) {
+                ctx->fwrite(buffer, 1, bufferMaxLen, target->stream);
+                bufferLen = 0;
+            }
+
+            buffer[bufferLen] = m;
+            bufferLen++;
             if (up_source_stream) {
                 jp_fseek(source, 2, SEEK_CUR); // up source by 2
             }
         }
     }
+    ctx->fwrite(buffer, 1, bufferLen, target->stream);
 }
 
 static int find_length(janpatch_ctx *ctx, janpatch_buffer *buffer) {
@@ -313,9 +332,12 @@ int janpatch(janpatch_ctx ctx, JANPATCH_STREAM *source, JANPATCH_STREAM *patch, 
     }
 
     int c;
+    u8 *eqlBuffer[0x10000];
+    int eqlBufferSize = 0x10000;
     while ((c = jp_getc(&ctx, &ctx.patch_buffer)) != EOF) {
         if (c == JANPATCH_OPERATION_ESC) {
-            switch ((c = jp_getc(&ctx, &ctx.patch_buffer))) {
+            c = jp_getc(&ctx, &ctx.patch_buffer);
+            switch (c) {
                 case JANPATCH_OPERATION_EQL: {
                     int length = find_length(&ctx, &ctx.patch_buffer);
                     if (length == -1) {
@@ -325,17 +347,15 @@ int janpatch(janpatch_ctx ctx, JANPATCH_STREAM *source, JANPATCH_STREAM *patch, 
                     }
 
                     JANPATCH_DEBUG("EQL: %d bytes\n", length);
-
-                    for (int ix = 0; ix < length; ix++) {
-                        int r = jp_getc(&ctx, &ctx.source_buffer);
-                        if (r < -1) {
-                            JANPATCH_ERROR("fread returned %d, but expected character\n", r);
-                            JANPATCH_ERROR("Positions are, source=%ld patch=%ld new=%ld\n", ctx.source_buffer.position, ctx.patch_buffer.position, ctx.target_buffer.position);
-                            return 1;
-                        }
-
-                        ctx.fwrite(&r, 1, 1,ctx.target_buffer.stream);
-                        
+                    
+                    int remaining = length;
+                    for (int ix = 0; remaining > 0; ix += eqlBufferSize) {
+                        int len = eqlBufferSize;
+                        if (remaining < len) len = remaining;
+                        jp_fread(&ctx, eqlBuffer, sizeof(u8), len, &ctx.source_buffer);
+                        jp_fwrite(&ctx, eqlBuffer, sizeof(u8), len, &ctx.target_buffer);
+                        //ctx.fwrite(eqlBuffer, sizeof(u8), len, target);
+                        remaining -= len;
                     }
 
                     break;

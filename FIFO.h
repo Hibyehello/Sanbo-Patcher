@@ -72,33 +72,29 @@ size_t FIFO::write2(const void *ptr, size_t size_dummy, size_t count,
 
 size_t FIFO::write(const void *ptr, size_t size_dummy, size_t count,
                    FILE *file) {
-  u8* buf = (u8*)ptr;
-  //printf("%c\n", *(char*)ptr);
-
-  for (int i = 0; i < count; i++) {
-    if (bufferFull) {
-      write2((void *)&buffer[writeIdx], sizeof(u8), 1, file);
-      //printf("Writing %c at %d\n", buffer[writeIdx], f_WritePos);
+    u8* buf = (u8*)ptr;
+    int room = size - writeIdx;
+    int remainingByteNum = 0;
+    if (size_dummy * count < room) {
+        room = size_dummy * count;
+    } else {
+        remainingByteNum = size_dummy * count - room;
     }
-
-    //printf("%s", (char*)&buf[i]);
-
-    buffer[writeIdx] = buf[i];
-
-    writeIdx = (++writeIdx) % size;
-
-    if (writeIdx == 0x0)
-      bufferFull = true;
-  }
-
-  //fprintf(stderr, "Write: %d, Read: %d\n", f_WritePos, f_ReadPos);
-
-  //TODO: Kevin has commented this out, uncomment if things are broken now, also see line 47
-  //TODO: OK - Hib
-  //f_WritePos = ftell(file);
-  //fseek(file, f_ReadPos, 0);
-
-  return size_dummy;
+    if (bufferFull) {
+        write2((void *)&buffer[writeIdx], sizeof(u8), room, file);
+    }
+    memcpy(&buffer[writeIdx], ptr, room);
+    
+    writeIdx = (writeIdx + room) % size;
+    if (writeIdx == 0x0) {
+        bufferFull = true;
+    }
+    if (remainingByteNum == 0x0) {
+        return room;
+    } else {
+        size_t res = write((void*)&buf[room], sizeof(u8), remainingByteNum, file);
+        return res;
+    }
 }
 
 void FIFO::flush(FILE* file)
